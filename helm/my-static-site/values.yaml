@@ -1,0 +1,66 @@
+replicaCount: 1
+
+image:
+  repository: nginx
+  pullPolicy: IfNotPresent
+  # tag is intentionally left blank; specified in values-dev/prod or command line
+  tag: "stable-alpine" # Default nginx tag
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+# Ingress configuration using Traefik IngressRoute CRD
+ingress:
+  enabled: true
+  # hostname will be set in stage-specific values (e.g., dev.local, prod.local)
+  hostname: ""
+  # Use Traefik's default self-signed certificate by not specifying tls secret
+  tls:
+    enabled: true
+    # secretName: my-static-site-tls # Optional: specify if you create a secret manually
+
+# Stage identifier (e.g., "dev", "prod")
+stage: dev
+
+# Secret configuration
+siteSecret:
+  # The name of the Kubernetes Secret object
+  name: site-secret
+  # The key within the secret that holds the sensitive message
+  key: message
+  # The actual secret message (use --set or values files for real secrets!)
+  # Example value, SHOULD BE OVERRIDDEN for security.
+  value: "DefaultSecretChangeMe"
+
+# Resource limits and requests (optional but recommended)
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+# Liveness and Readiness probes
+probes:
+  enabled: true
+  liveness:
+    path: /
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 1
+    failureThreshold: 3
+  readiness:
+    path: /
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 1
+    failureThreshold: 3
+
+# Namespace configuration
+namespace:
+  create: true # Whether to create the namespace defined below
+  name: "" # Will be set based on the stage (e.g., "dev", "prod")
+

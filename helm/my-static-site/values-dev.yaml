@@ -1,0 +1,18 @@
+ingress:
+  enabled: true
+  hostname: "dev.my-static-site.local" # Hostname for dev
+  tls:
+    enabled: true
+
+stage: dev
+
+siteSecret:
+  name: site-secret-dev # Unique secret name for dev
+  key: message
+  # Example secret value for dev - use Helm secrets management in real scenarios!
+  value: "SuperSecretDevCode"
+
+namespace:
+  create: true
+  name: "dev" # Deploy into the 'dev' namespace
+
