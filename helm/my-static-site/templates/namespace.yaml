@@ -1,0 +1,8 @@
+{{- if .Values.namespace.create }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "my-static-site.namespace" . }}
+  labels:
+    {{- include "my-static-site.labels" . | nindent 4 }}
+{{- end }}

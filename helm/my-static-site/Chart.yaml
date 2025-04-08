@@ -1,0 +1,7 @@
+apiVersion: v2
+name: my-static-site
+description: A Helm chart for deploying a static site behind Traefik with env injection.
+type: application
+version: 0.1.0 # Chart version
+appVersion: "1.16.0" # Version of the app (e.g., nginx version)
+

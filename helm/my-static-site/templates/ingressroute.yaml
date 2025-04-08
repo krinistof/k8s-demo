@@ -1,0 +1,27 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "my-static-site.fullname" . }}
+  namespace: {{ include "my-static-site.namespace" . }}
+  labels:
+    {{- include "my-static-site.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    - websecure # Use the secure entrypoint defined in Traefik (usually handles HTTPS)
+  routes:
+    - match: Host(`{{ .Values.ingress.hostname }}`) # Match based on hostname from values
+      kind: Rule
+      services:
+        - name: {{ include "my-static-site.fullname" . }} # Point to the Kubernetes Service
+          port: {{ .Values.service.port }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    # If secretName is omitted, Traefik v2.5+ can generate a default self-signed cert.
+    # If you want to use a specific secret (e.g., from cert-manager or manual creation):
+    # secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "my-static-site.fullname" .)) }}
+    # For Let's Encrypt, you would add:
+    # certResolver: myresolver # Replace 'myresolver' with your Traefik CertResolver name
+  {{- end }}
+{{- end }}
+

@@ -1,0 +1,8 @@
+[package]
+name = "secret-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rocket = "0.5.1"
+uuid = { version = "1.16.0", features = ["v4"] }

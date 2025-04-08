@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "my-static-site.fullname" . }}-html-template
+  namespace: {{ include "my-static-site.namespace" . }}
+  labels:
+    {{- include "my-static-site.labels" . | nindent 4 }}
+data:
+  index.html.template: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Welcome!</title>
+      <style>
+        body { font-family: sans-serif; background-color: #f0f0f0; color: #333; text-align: center; padding-top: 50px; }
+        .container { background-color: #fff; padding: 30px; border-radius: 8px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .secret { color: #e91e63; font-weight: bold; } /* Style for the secret part */
+        .stage { color: #007bff; font-weight: bold; } /* Style for the stage part */
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>Hello World!</h1>
+        <p>I am on <span class="stage">@@STAGE@@</span> stage.</p>
+        <p>This is my secret: <span class="secret">@@SECRET_MESSAGE@@</span>.</p>
+      </div>
+    </body>
+    </html>
+
