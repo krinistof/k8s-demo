@@ -1,10 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: nginx
+  repository: secret-server
   pullPolicy: IfNotPresent
-  # tag is intentionally left blank; specified in values-dev/prod or command line
-  tag: "stable-alpine" # Default nginx tag
+  tag: "latest"
 
 # Service configuration
 service:

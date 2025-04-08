@@ -9,9 +9,8 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port }}
-      targetPort: http # Corresponds to the container port name
+      targetPort: http 
       protocol: TCP
       name: http
   selector:
     {{- include "my-static-site.selectorLabels" . | nindent 4 }}
-

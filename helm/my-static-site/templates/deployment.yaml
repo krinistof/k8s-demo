@@ -1,4 +1,3 @@
-# Defines the Nginx Deployment.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,83 +15,24 @@ spec:
       labels:
         {{- include "my-static-site.selectorLabels" . | nindent 8 }}
     spec:
-      # Volume for the generated index.html
-      volumes:
-      - name: html-content
-        emptyDir: {} # Simple empty directory volume shared between init and main container
-      # Volume for the index.html template from ConfigMap
-      - name: html-template-volume
-        configMap:
-          name: {{ include "my-static-site.fullname" . }}-html-template
-          items:
-          - key: index.html.template
-            path: index.html.template # Make template available at this path
-
-      # Init container to process the template and inject environment variables
-      initContainers:
-      - name: template-processor
-        # Use alpine image, install gettext (for envsubst)
-        image: alpine:latest
-        # Command to install dependencies, substitute variables, and write to the shared volume
-        command: ['sh', '-c']
-        args:
-          - |
-            echo "--- Starting initContainer ---"
-            echo "--- Installing gettext (for envsubst) ---"
-            apk update && apk add gettext
-            echo "--- Checking environment variables ---"
-            env | grep SITE_SECRET_MESSAGE # Check if the secret env var is set
-            env | grep STAGE # Check if STAGE is set (should be from command below)
-            echo "--- Exporting variables ---"
-            # Export the secret message from the mounted secret env var
-            export SITE_SECRET_MESSAGE=$SITE_SECRET_MESSAGE
-            # Export the stage name from the value file
-            export STAGE={{ .Values.stage | upper | quote }}
-            echo "SITE_SECRET_MESSAGE is: [$SITE_SECRET_MESSAGE]" # Log the value
-            echo "STAGE is: [$STAGE]" # Log the value
-            echo "--- Checking template file ---"
-            ls -l /template/index.html.template
-            cat /template/index.html.template # Log template content
-            echo "--- Processing template using envsubst ---"
-            # Use envsubst to replace placeholders in the template
-            # Input: /template/index.html.template
-            # Output: /usr/share/nginx/html/index.html (in the shared volume)
-            envsubst '@@SECRET_MESSAGE@@ @@STAGE@@' < /template/index.html.template > /usr/share/nginx/html/index.html
-            echo "--- Checking output file ---"
-            ls -l /usr/share/nginx/html/index.html # Log output file for debugging
-            cat /usr/share/nginx/html/index.html # Log content for debugging
-            echo "--- initContainer finished successfully ---"
-        # Mount the template volume (read-only)
-        volumeMounts:
-        - name: html-template-volume
-          mountPath: /template
-          readOnly: true
-        # Mount the shared content volume (read-write)
-        - name: html-content
-          mountPath: /usr/share/nginx/html # Target directory for processed file
-        # Environment variable sourcing the secret
-        env:
-        - name: SITE_SECRET_MESSAGE
-          valueFrom:
-            secretKeyRef:
-              # Name and key from values.yaml
-              name: {{ .Values.siteSecret.name }}
-              key: {{ .Values.siteSecret.key }}
-
-      # Main Nginx container
       containers:
-      - name: {{ .Chart.Name }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+      - name: "secret-server"
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
         - name: http
           containerPort: 80
           protocol: TCP
-        # Mount the shared volume where the processed index.html is located
-        volumeMounts:
-        - name: html-content
-          mountPath: /usr/share/nginx/html # Nginx default document root
-          readOnly: true # Nginx only needs to read it
+
+        env:
+        - name: STAGE
+          value: {{ .Values.stage | upper | quote }}
+        - name: SECRET_MESSAGE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.siteSecret.name }}
+              key: {{ .Values.siteSecret.key }}
+
         {{- if .Values.probes.enabled }}
         livenessProbe:
           httpGet:
@@ -112,6 +52,4 @@ spec:
           failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
         {{- end }}
         resources:
-          {{- toYaml .Values.resources | nindent 10 }}
-
-    
+          {{- toYaml .Values.resources | nindent 12 }}
