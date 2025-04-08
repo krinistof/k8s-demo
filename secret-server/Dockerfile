@@ -1,29 +1,25 @@
-    FROM rust:1-slim-bookworm as builder
+#!/usr/bin/env docker build -t krinistof/secret-server:latest .
+ 
+FROM rust:1-slim-bookworm AS builder
 
-    WORKDIR /usr/src/secret-server
+WORKDIR /usr/src/secret-server
 
-    COPY Cargo.toml Cargo.lock ./
-    RUN mkdir src && echo "fn main() {}" > src/main.rs
-    RUN cargo build --release
-    RUN rm -rf src
+# See .dockerignore
+COPY . /usr/src/secret-server
 
-    COPY ./src ./src
-    COPY ./templates ./templates
-    COPY Rocket.toml ./Rocket.toml
+#TODO implement dependency caching
+RUN cargo build --release
 
-    RUN cargo build --release
+FROM gcr.io/distroless/cc-debian12
 
-    FROM gcr.io/distroless/cc-debian12
+# Copy the compiled binary from the builder stage
+COPY --from=builder /usr/src/secret-server/target/release/secret-server /usr/local/bin/secret-server
+COPY --from=builder /usr/src/secret-server/Rocket.toml /app/
 
-    COPY --from=builder /usr/src/secret-server/target/release/secret-server /usr/local/bin/secret-server
-    COPY --from=builder /usr/src/secret-server/Rocket.toml /app/Rocket.toml
+WORKDIR /app
 
-    # Set working directory for Rocket to find Rocket.toml and templates/
-    WORKDIR /app
+EXPOSE 80
 
-    # Expose the port Rocket will listen on (configured in Rocket.toml)
-    EXPOSE 80
+# Set the entrypoint for the container
+ENTRYPOINT ["/usr/local/bin/secret-server"]
 
-    # Set the entrypoint for the container
-    ENTRYPOINT ["/usr/local/bin/secret-server"]
-    

@@ -1,0 +1,35 @@
+# Defines resources to redirect HTTP traffic to HTTPS
+#
+{{- if and .Values.ingress.enabled .Values.ingress.redirectToHttps }}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "my-static-site.fullname" . }}-redirect-https
+  namespace: {{ include "my-static-site.namespace" . }}
+  labels:
+    {{- include "my-static-site.labels" . | nindent 4 }}
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true # Use 301 redirect
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "my-static-site.fullname" . }}-http-redirect
+  namespace: {{ include "my-static-site.namespace" . }}
+  labels:
+    {{- include "my-static-site.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`{{ .Values.ingress.hostname }}`)
+      kind: Rule
+      middlewares:
+        - name: {{ include "my-static-site.fullname" . }}-redirect-https
+          namespace: {{ include "my-static-site.namespace" . }}
+{{- end }}
+

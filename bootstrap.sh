@@ -1,14 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# bootstrap.sh - Sets up Minikube and installs Traefik for the static site deployment.
-# v3: Removed --wait from helm install for Traefik to avoid LoadBalancer IP issues in Minikube.
+# Sets up Traefik on Docker Desktop Kubernetes.
+# Assumes Kubernetes is already enabled in Docker Desktop settings.
 
 set -eo pipefail # Exit on error, treat unset variables as error, propagate pipe failures
 
 # -- Configuration --
-MINIKUBE_PROFILE="static-site-demo" # Name for the Minikube profile
-MINIKUBE_CPUS="2"                   # Number of CPUs for Minikube VM
-MINIKUBE_MEMORY="4096"              # Memory for Minikube VM (in MB) - Increase if needed!
+DOCKER_K8S_CONTEXT="docker-desktop" # Expected kubectl context name
 TRAEFIK_NAMESPACE="traefik-system"  # Namespace for Traefik
 TRAEFIK_HELM_REPO="https://helm.traefik.io/traefik"
 TRAEFIK_HELM_CHART="traefik/traefik"
@@ -35,21 +33,24 @@ check_command() {
 # -- Main Script --
 
 info "Checking prerequisites..."
-check_command "minikube"
-check_command "helm"
 check_command "kubectl"
+check_command "helm"
+info "Ensure Docker Desktop is running and Kubernetes is ENABLED in Docker Desktop Settings."
+sleep 3 # Give user time to read
 
-info "Starting Minikube (profile: ${MINIKUBE_PROFILE})..."
-if minikube status -p "${MINIKUBE_PROFILE}" &> /dev/null; then
-    info "Minikube profile '${MINIKUBE_PROFILE}' already running."
-    # Ensure kubectl context is set
-    minikube update-context -p "${MINIKUBE_PROFILE}"
-    kubectl config use-context "${MINIKUBE_PROFILE}"
-else
-    info "Starting new Minikube instance..."
-    minikube start --profile "${MINIKUBE_PROFILE}" --cpus "${MINIKUBE_CPUS}" --memory "${MINIKUBE_MEMORY}" --driver=docker
-    info "Minikube started."
+info "Checking kubectl context '${DOCKER_K8S_CONTEXT}'..."
+if ! kubectl config get-contexts "${DOCKER_K8S_CONTEXT}" > /dev/null 2>&1; then
+    error "Kubectl context '${DOCKER_K8S_CONTEXT}' not found. Is Kubernetes enabled in Docker Desktop?"
 fi
+
+info "Setting kubectl context to '${DOCKER_K8S_CONTEXT}'..."
+kubectl config use-context "${DOCKER_K8S_CONTEXT}"
+
+info "Checking Docker Desktop Kubernetes node status..."
+if ! kubectl get node "${DOCKER_K8S_CONTEXT}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' | grep -q True; then
+    error "Docker Desktop Kubernetes node is not reporting Ready status. Please check Docker Desktop."
+fi
+info "Docker Desktop Kubernetes node is Ready."
 
 info "Adding Traefik Helm repository..."
 helm repo add traefik "${TRAEFIK_HELM_REPO}" || info "Traefik repo already exists."
@@ -59,8 +60,8 @@ info "Installing Traefik using Helm (version ${TRAEFIK_CHART_VERSION})..."
 # Create namespace if it doesn't exist
 kubectl create namespace "${TRAEFIK_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
-# Install Traefik Helm chart - REMOVED --wait flag
-# Helm will now exit quickly after applying manifests. We check pod readiness below.
+# Install Traefik Helm chart using DaemonSet and hostPorts for localhost access
+# Removed --wait from helm install; checking pod readiness explicitly below
 helm upgrade --install "${TRAEFIK_HELM_RELEASE_NAME}" "${TRAEFIK_HELM_CHART}" \
   --namespace "${TRAEFIK_NAMESPACE}" \
   --version "${TRAEFIK_CHART_VERSION}" \
@@ -87,28 +88,24 @@ if ! kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=traefik -n
      info "Run this command to check pod events: kubectl describe pod <pod-name> -n ${TRAEFIK_NAMESPACE}"
      exit 1
 fi
-
 info "Traefik pods are ready."
-info "Getting Minikube IP..."
 
-# Get the Minikube IP, which acts as the external IP for LoadBalancer services
-MINIKUBE_IP=$(minikube ip -p "${MINIKUBE_PROFILE}")
-if [ -z "${MINIKUBE_IP}" ]; then
-    error "Could not get Minikube IP address."
-fi
-info "Minikube IP: ${MINIKUBE_IP}"
-info "You will need to add entries to your Windows hosts file (C:\\Windows\\System32\\drivers\\etc\\hosts) as Administrator:"
+info "---------------------------------------------------------------------"
+info "IMPORTANT: Update your Windows hosts file!"
+info "Edit C:\\Windows\\System32\\drivers\\etc\\hosts (as Administrator)"
+info "Add or update the following line to point to localhost:"
 info "---"
-info "${MINIKUBE_IP} dev.my-static-site.local prod.my-static-site.local"
+info "127.0.0.1  dev.my-static-site.local prod.my-static-site.local"
 info "---"
+info "(Remove or comment out any old lines pointing these hostnames to other IPs)"
+info "---------------------------------------------------------------------"
 echo ""
-info "Bootstrap complete! You can now deploy the application Helm chart."
-info "Example deployment commands:"
-info "  helm install dev-site ./helm/my-static-site -f ./helm/my-static-site/values-dev.yaml --namespace dev --create-namespace"
-info "  helm install prod-site ./helm/my-static-site -f ./helm/my-static-site/values-prod.yaml --namespace prod --create-namespace"
+info "Bootstrap for Docker Desktop Kubernetes complete!"
+info "You can now deploy the application Helm chart."
+info "Example deployment command (ensure namespace does NOT exist first or remove --create-namespace):"
+info "  helm upgrade --install dev-site ./helm/my-static-site -f ./helm/my-static-site/values-dev.yaml --namespace dev"
 echo ""
-info "Access dev site (after adding to hosts file): https://dev.my-static-site.local"
-info "Access prod site (after adding to hosts file): https://prod.my-static-site.local"
+info "Access dev site (after updating hosts file): https://dev.my-static-site.local"
 info "(You will likely need to accept the self-signed certificate warning in your browser)"
 
     
